@@ -36,6 +36,17 @@ import timber.log.Timber;
  */
 public final class VpnBuilder {
     /**
+     * Preference value for {@link PreferenceHelper#getVpnExcludedSystemApps(Context)} meaning every
+     * system application should be excluded from the VPN.
+     */
+    private static final String SYSTEM_APPS_EXCLUDE_ALL = "all";
+    /**
+     * Preference value for {@link PreferenceHelper#getVpnExcludedSystemApps(Context)} meaning every
+     * system application should be excluded from the VPN except web browsers.
+     */
+    private static final String SYSTEM_APPS_EXCLUDE_ALL_EXCEPT_BROWSERS = "allExceptBrowsers";
+
+    /**
      * Private constructor.
      */
     private VpnBuilder() {
@@ -96,7 +107,7 @@ public final class VpnBuilder {
         ApplicationInfo self = context.getApplicationInfo();
         Set<String> excludedApps = PreferenceHelper.getVpnExcludedApps(context);
         String vpnExcludedSystemApps = PreferenceHelper.getVpnExcludedSystemApps(context);
-        Set<String> webBrowserPackageName = vpnExcludedSystemApps.equals("allExceptBrowsers") ?
+        Set<String> webBrowserPackageName = SYSTEM_APPS_EXCLUDE_ALL_EXCEPT_BROWSERS.equals(vpnExcludedSystemApps) ?
                 getWebBrowserPackageName(packageManager) :
                 emptySet();
 
@@ -109,8 +120,8 @@ public final class VpnBuilder {
             }
             // Check system app
             if ((applicationInfo.flags & FLAG_SYSTEM) != 0) {
-                excluded = vpnExcludedSystemApps.equals("all") ||
-                        (vpnExcludedSystemApps.equals("allExceptBrowsers") && !webBrowserPackageName.contains(applicationInfo.packageName));
+                excluded = SYSTEM_APPS_EXCLUDE_ALL.equals(vpnExcludedSystemApps) ||
+                        (SYSTEM_APPS_EXCLUDE_ALL_EXCEPT_BROWSERS.equals(vpnExcludedSystemApps) && !webBrowserPackageName.contains(applicationInfo.packageName));
             }
             // Check user excluded applications
             else if (excludedApps.contains(applicationInfo.packageName)) {

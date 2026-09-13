@@ -103,6 +103,10 @@ public class DnsPacketProxyTest {
     /**
      * Wrap a payload in a UDP/IPv4 packet aimed at port 53, which is what makes pcap4j parse the
      * payload as DNS rather than keep it as opaque bytes.
+     * <p>
+     * Any failure here is a bug in the test fixture, not in the production code: wrap the real
+     * pcap4j exception so its class and message survive into the JUnit report instead of being
+     * flattened into a generic "Failed to build the test packet" line.
      */
     private static byte[] udpOverIpv4(byte[] payload) {
         try {
@@ -116,7 +120,7 @@ public class DnsPacketProxyTest {
                     .correctLengthAtBuild(true);
             return new IpV4Packet.Builder()
                     .version(IpVersion.IPV4)
-                    .tos(() -> (byte) 0)
+                    .tos((byte) 0)
                     .protocol(IpNumber.UDP)
                     .srcAddr((Inet4Address) InetAddress.getByName("192.0.2.1"))
                     .dstAddr((Inet4Address) InetAddress.getByName("192.0.2.2"))
@@ -126,7 +130,9 @@ public class DnsPacketProxyTest {
                     .build()
                     .getRawData();
         } catch (Exception e) {
-            throw new IllegalStateException("Failed to build the test packet.", e);
+            throw new IllegalStateException(
+                    "Failed to build the test packet: " + e.getClass().getName() + ": " + e.getMessage(),
+                    e);
         }
     }
 
@@ -140,7 +146,7 @@ public class DnsPacketProxyTest {
             try {
                 return Optional.of(InetAddress.getByName("192.168.1.1"));
             } catch (Exception e) {
-                throw new IllegalStateException(e);
+                throw new IllegalStateException("Failed to resolve the fake DNS server address.", e);
             }
         }
     }

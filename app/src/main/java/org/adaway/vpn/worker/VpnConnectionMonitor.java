@@ -2,7 +2,6 @@ package org.adaway.vpn.worker;
 
 import static java.lang.Integer.parseInt;
 import static java.util.Objects.requireNonNull;
-
 import android.content.Context;
 
 import org.adaway.helper.PreferenceHelper;
@@ -80,17 +79,25 @@ public class VpnConnectionMonitor {
         // Ensure current is still a tunnel interface (it happens to change), otherwise picks other
         Matcher currentMatcher = TUNNEL_PATTERN.matcher(current.getName());
         if (!currentMatcher.matches()) {
-            Timber.e("Current interface %s is no more a tunnel interface.", current.getName());
+            Timber.w("Current interface %s is no more a tunnel interface.", current.getName());
             return other;
         }
         // Compare current and ot then pick the last one
-        int currentTunnelNumber = parseInt(requireNonNull(currentMatcher.group(1)));
-        int otherTunnelNumber = parseInt(requireNonNull(otherMatcher.group(1)));
+        int currentTunnelNumber = parseInt(currentMatcher.group(1));
+        int otherTunnelNumber = parseInt(otherMatcher.group(1));
         return otherTunnelNumber > currentTunnelNumber ? other : current;
     }
 
     /**
      * Initialize the monitor once the VPN connection is up.
+     * <p>
+     * Must be called once the tunnel interface is actually present. If no {@code tunX}
+     * interface exists at call time (for example because the worker is still in the
+     * throttle-wait before the tunnel is established), this method throws
+     * {@link IllegalStateException}: the caller is expected to retry once the tunnel
+     * is up rather than treat this as a fatal error.
+     *
+     * @throws IllegalStateException If no VPN tunnel interface is currently present.
      */
     void initialize() {
         Timber.d("Initializing connection monitor…");
@@ -100,6 +107,11 @@ public class VpnConnectionMonitor {
 
     /**
      * Monitor the VPN network interface is still up while the VPN is running.
+     * <p>
+     * A {@link #stop()} arriving while the loop is sleeping is honoured on the next
+     * cycle, so shutdown can take up to {@link #CONNECTION_CHECK_DELAY_MS} to take
+     * effect. This bounded latency is deliberate: the loop is cheap and a tighter
+     * wake-up would need a lock or condition variable for no practical benefit.
      */
     void monitor() {
         while (this.running.get()) {
@@ -139,6 +151,13 @@ public class VpnConnectionMonitor {
      * while the tunnel is in fact still up, which made the monitor tear down a perfectly working
      * tunnel every 10s in a restart loop. Checking for presence also transparently handles the
      * interface being renumbered (e.g. {@code tun0} → {@code tun1}) on a rebuild.
+     * <p>
+     * Trade-off: "present" means <em>any</em> {@code tunX} interface exists, not necessarily
+     * the one this monitor cached. Android only allows one active {@link android.net.VpnService}
+     * at a time, so a foreign tunnel is not a realistic case, and the alternative (matching
+     * the exact interface) reintroduces the false-positive restarts this method exists to
+     * avoid. Do not "fix" this back to {@code isUp()} on the cached instance without
+     * reproducing the original restart-loop bug first.
      *
      * @return <code>true</code> if a tunnel interface is present, or if the tunnel has not
      * been initialized yet, or if the interfaces could not be probed at all (transient error);

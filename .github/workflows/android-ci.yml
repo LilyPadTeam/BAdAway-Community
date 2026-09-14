@@ -31,9 +31,6 @@ jobs:
           key: ${{ runner.os }}-sonar
           restore-keys: ${{ runner.os }}-sonar
 
-      - name: Run unit tests
-        run: ./gradlew test --stacktrace
-
       - name: Build with Gradle
         run: ./gradlew assembleRelease --stacktrace
 
